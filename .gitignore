@@ -1,0 +1,28 @@
+# Telegram sessions and auth tokens
+*.session
+*.session-journal
+session/
+auth_state.json
+
+# Local database and downloaded media
+logs.db
+logs.db-journal
+media/*
+!media/.gitkeep
+avatars/*
+!avatars/.gitkeep
+
+# Environment variables and secrets
+.env
+*.txt
+!requirements.txt
+
+# Python virtual environment and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.idea/
+.vscode/
