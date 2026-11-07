@@ -334,13 +334,20 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .w{max-width:1200px;margin:0 auto;padding:16px}
 
 /* Панель фильтров */
-.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px}
-.search-box{flex:1;min-width:240px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:16px}
+.search-box{flex:1;min-width:220px}
 .search-box input{width:100%;box-sizing:border-box;margin-bottom:0;padding:10px 14px;background:#141414;color:#fff;
- border:1px solid #222;border-radius:6px;font:inherit;outline:none;transition:border-color 0.15s}
+ border:1px solid #222;border-radius:6px;font:inherit;outline:none;transition:border-color 0.15s;height:42px}
 .search-box input:focus{border-color:#444}
-.date-input{background:#141414;color:#aaa;border:1px solid #222;border-radius:6px;padding:8px 12px;font:inherit;font-size:13px;outline:none;color-scheme:dark;height:42px;box-sizing:border-box;cursor:pointer;transition:border-color 0.15s,color 0.15s}
-.date-input:hover,.date-input:focus{border-color:#444;color:#fff}
+
+/* Кастомная кнопка выбора даты */
+.date-pill-wrap{position:relative;display:inline-flex;align-items:center}
+.hidden-date-input{position:absolute;top:0;left:0;opacity:0;pointer-events:none;width:1px;height:1px}
+.date-pill{display:inline-flex;align-items:center;gap:7px}
+.date-icon{display:inline-block;vertical-align:middle;flex-shrink:0;opacity:0.8}
+.date-clear{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#333;color:#aaa;font-size:10px;font-weight:700;margin-left:4px;cursor:pointer;transition:all 0.15s}
+.date-clear:hover{background:#555;color:#fff}
+
 .pills{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .pill{background:#141414;color:#888;border:1px solid #222;border-radius:6px;padding:8px 14px;font:500 13px 'Onest',sans-serif;cursor:pointer;transition:all 0.15s;user-select:none;height:42px;box-sizing:border-box}
 .pill:hover{background:#1a1a1a;color:#ccc;border-color:#333}
@@ -354,7 +361,7 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 table{width:100%;border-collapse:collapse}
 
 /* Разделители по датам */
-tr.sep-row td{padding:0;background:#0a0a0a !important}
+tr.sep-row td{padding:0;background:#0a0a0a !important;border:none}
 tr.sep-row:hover td{background:#0a0a0a !important}
 
 .sep-year{
@@ -397,10 +404,16 @@ tr.sep-row:hover td{background:#0a0a0a !important}
   background:#1e1e1e;
 }
 
-/* Строки сообщений и зебра */
+/* Строки сообщений (зебра) - серый прямоугольник на ховер полностью убран */
 tr.row-odd{background:#0d0d0d}
 tr.row-even{background:#141414}
-tr.row-odd:hover, tr.row-even:hover{background:#202020}
+tr:hover{background:none}
+tr.row-odd:hover{background:#0d0d0d}
+tr.row-even:hover{background:#141414}
+
+/* Пустое состояние */
+tr.empty-row td{background:transparent !important;padding:48px 10px;text-align:center;color:#666;font-size:14px;border:none}
+tr.empty-row:hover td{background:transparent !important}
 
 td{padding:10px 14px;vertical-align:top}
 .n{width:50px;color:#666;font-size:13px;font-weight:400}
@@ -463,7 +476,19 @@ td{padding:10px 14px;vertical-align:top}
   <div class="search-box">
     <input id="searchInput" placeholder="Поиск по тексту или чату…" oninput="onSearchInput(this.value)">
   </div>
-  <input type="date" id="dateInput" class="date-input" onchange="onDateChange(this.value)" title="Фильтр по дате">
+  
+  <div class="date-pill-wrap">
+    <button id="datePill" class="pill date-pill" onclick="openDatePicker()" type="button">
+      <svg class="date-icon" viewBox="0 0 16 16" width="13" height="13" fill="none">
+        <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M2 7h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span id="dateLabel">Дата</span>
+      <span id="dateClearBtn" class="date-clear" onclick="clearDate(event)" style="display:none" title="Сбросить дату">✕</span>
+    </button>
+    <input type="date" id="dateInput" class="hidden-date-input" onchange="onDateSelected(this.value)">
+  </div>
+
   <div class="pills">
     <button class="pill active" data-filter="all" onclick="setFilter('all')">Все</button>
     <button class="pill" data-filter="deleted" onclick="setFilter('deleted')">Удалённые</button>
@@ -495,12 +520,76 @@ let currentAudioSrc = null;
 
 // Инициализация полей
 document.getElementById('searchInput').value = currentQ;
-document.getElementById('dateInput').value = currentDate;
+updateDateUI();
 updatePillsUI();
 updateChatTagUI();
 
+const monthsGen = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+function formatDateLabel(val) {
+  if (!val) return 'Дата';
+  const parts = val.split('-');
+  if (parts.length === 3) {
+    const d = parseInt(parts[2], 10);
+    const m = parseInt(parts[1], 10);
+    const mStr = monthsGen[m] || parts[1];
+    return d + ' ' + mStr;
+  }
+  return val;
+}
+
+function updateDateUI() {
+  const pill = document.getElementById('datePill');
+  const label = document.getElementById('dateLabel');
+  const clearBtn = document.getElementById('dateClearBtn');
+  const input = document.getElementById('dateInput');
+  if (currentDate) {
+    pill.classList.add('active');
+    label.textContent = formatDateLabel(currentDate);
+    clearBtn.style.display = 'inline-flex';
+    if (input) input.value = currentDate;
+  } else {
+    pill.classList.remove('active');
+    label.textContent = 'Дата';
+    clearBtn.style.display = 'none';
+    if (input) input.value = '';
+  }
+}
+
+function openDatePicker() {
+  const input = document.getElementById('dateInput');
+  if (!input) return;
+  try {
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+    } else {
+      input.click();
+    }
+  } catch (e) {
+    input.click();
+  }
+}
+
+function onDateSelected(val) {
+  currentDate = val;
+  updateDateUI();
+  updateURL();
+  fetchRows(true);
+}
+
+function clearDate(e) {
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  currentDate = '';
+  updateDateUI();
+  updateURL();
+  fetchRows(true);
+}
+
 function updatePillsUI() {
-  document.querySelectorAll('.pill').forEach(p => {
+  document.querySelectorAll('.pill[data-filter]').forEach(p => {
     p.classList.toggle('active', p.getAttribute('data-filter') === currentFilter);
   });
 }
@@ -540,17 +629,18 @@ function onSearchInput(val) {
   searchTimer = setTimeout(() => {
     updateURL();
     fetchRows(true);
-  }, 250);
-}
-
-function onDateChange(val) {
-  currentDate = val;
-  updateURL();
-  fetchRows(true);
+  }, 200);
 }
 
 function setFilter(f) {
   currentFilter = f;
+  if (f === 'all') {
+    // Мгновенный сброс даты и чата при переходе на "Все", чтобы сразу отобразились все сообщения без задержки
+    currentDate = '';
+    currentChat = '';
+    currentChatTitle = '';
+    updateDateUI();
+  }
   updatePillsUI();
   updateURL();
   fetchRows(true);
@@ -577,7 +667,7 @@ function resetAllFilters() {
   currentChatTitle = '';
   currentDate = '';
   document.getElementById('searchInput').value = '';
-  document.getElementById('dateInput').value = '';
+  updateDateUI();
   updatePillsUI();
   updateURL();
   fetchRows(true);
@@ -608,7 +698,10 @@ function applyAppleEmojis(root) {
 // Запускаем при загрузке
 applyAppleEmojis(document.getElementById('tb'));
 
+let isFetching = false;
 async function fetchRows(force = false) {
+  if (isFetching && !force) return;
+  isFetching = true;
   try {
     const p = new URLSearchParams();
     if (currentQ) p.set('q', currentQ);
@@ -641,7 +734,10 @@ async function fetchRows(force = false) {
       }
       applyAppleEmojis(tb);
     }
-  } catch(e) {}
+  } catch(e) {
+  } finally {
+    isFetching = false;
+  }
 }
 
 setInterval(() => fetchRows(false), 3000);
@@ -915,7 +1011,7 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         )
 
     if not out:
-        return '<tr><td colspan="4" style="text-align:center;padding:40px 10px;color:#666;font-size:14px">Сообщений не найдено</td></tr>'
+        return '<tr class="empty-row"><td colspan="4">Сообщений не найдено</td></tr>'
 
     return "".join(out)
 
