@@ -340,21 +340,18 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
  border:1px solid #222;border-radius:6px;font:inherit;outline:none;transition:border-color 0.15s;height:42px}
 .search-box input:focus{border-color:#444}
 
-/* Кастомная кнопка выбора даты */
-.date-pill-wrap{position:relative;display:inline-flex;align-items:center}
-.hidden-date-input{position:absolute;top:0;left:0;opacity:0;pointer-events:none;width:1px;height:1px}
-.date-pill{display:inline-flex;align-items:center;gap:7px}
-.date-icon{display:inline-block;vertical-align:middle;flex-shrink:0;opacity:0.8}
-.date-clear{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#333;color:#aaa;font-size:10px;font-weight:700;margin-left:4px;cursor:pointer;transition:all 0.15s}
-.date-clear:hover{background:#555;color:#fff}
-
+.toolbar-divider{width:1px;height:24px;background:#222;margin:0 4px}
 .pills{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .pill{background:#141414;color:#888;border:1px solid #222;border-radius:6px;padding:8px 14px;font:500 13px 'Onest',sans-serif;cursor:pointer;transition:all 0.15s;user-select:none;height:42px;box-sizing:border-box}
 .pill:hover{background:#1a1a1a;color:#ccc;border-color:#333}
 .pill.active{background:#262626;color:#fff;border-color:#4a4a4a}
-.chat-tag{display:inline-flex;align-items:center;gap:6px;background:#142218;color:#4ade80;border:1px solid #22542e;border-radius:6px;padding:6px 12px;font-size:13px;font-weight:500;height:42px;box-sizing:border-box}
-.chat-tag-close{cursor:pointer;opacity:0.75;font-weight:700;margin-left:4px;padding:0 2px}
-.chat-tag-close:hover{opacity:1;color:#fff}
+
+.filter-tag{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:6px 12px;font-size:13px;font-weight:500;height:42px;box-sizing:border-box}
+.chat-tag{background:#142218;color:#4ade80;border:1px solid #22542e}
+.date-tag{background:#1a1926;color:#c4b5fd;border:1px solid #3b3563}
+.tag-close{cursor:pointer;opacity:0.75;font-weight:700;margin-left:4px;padding:0 2px}
+.tag-close:hover{opacity:1;color:#fff}
+
 .reset-btn{background:none;border:none;color:#666;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;padding:6px 10px;height:42px}
 .reset-btn:hover{color:#aaa}
 
@@ -389,13 +386,21 @@ tr.sep-row:hover td{background:#0a0a0a !important}
 
 .sep-day-text{
   background:#161616;
-  color:#ccc;
-  border:1px solid #2a2a2a;
+  color:#bbb;
+  border:1px solid #262626;
   padding:3px 12px;
   border-radius:12px;
   font-size:12px;
   font-weight:500;
   white-space:nowrap;
+  cursor:pointer;
+  transition:all 0.15s;
+  user-select:none;
+}
+.sep-day-text:hover{
+  background:#262626;
+  color:#fff;
+  border-color:#444;
 }
 
 .sep-day-line{
@@ -476,29 +481,27 @@ td{padding:10px 14px;vertical-align:top}
   <div class="search-box">
     <input id="searchInput" placeholder="Поиск по тексту или чату…" oninput="onSearchInput(this.value)">
   </div>
-  
-  <div class="date-pill-wrap">
-    <button id="datePill" class="pill date-pill" onclick="openDatePicker()" type="button">
-      <svg class="date-icon" viewBox="0 0 16 16" width="13" height="13" fill="none">
-        <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
-        <path d="M2 7h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      <span id="dateLabel">Дата</span>
-      <span id="dateClearBtn" class="date-clear" onclick="clearDate(event)" style="display:none" title="Сбросить дату">✕</span>
-    </button>
-    <input type="date" id="dateInput" class="hidden-date-input" onchange="onDateSelected(this.value)">
-  </div>
 
   <div class="pills">
     <button class="pill active" data-filter="all" onclick="setFilter('all')">Все</button>
     <button class="pill" data-filter="deleted" onclick="setFilter('deleted')">Удалённые</button>
     <button class="pill" data-filter="edited" onclick="setFilter('edited')">Изменённые</button>
     <button class="pill" data-filter="media" onclick="setFilter('media')">С медиа</button>
+    <div class="toolbar-divider"></div>
+    <button id="pillToday" class="pill" onclick="toggleQuickDate('today')">Сегодня</button>
+    <button id="pillYesterday" class="pill" onclick="toggleQuickDate('yesterday')">Вчера</button>
   </div>
-  <div id="chatFilterTag" class="chat-tag" style="display:none">
+
+  <div id="dateFilterTag" class="filter-tag date-tag" style="display:none">
+    <span>📅</span> <span id="dateFilterName"></span>
+    <span class="tag-close" onclick="clearDateFilter()" title="Сбросить фильтр даты">✕</span>
+  </div>
+
+  <div id="chatFilterTag" class="filter-tag chat-tag" style="display:none">
     <span>Чат:</span> <span id="chatFilterName"></span>
-    <span class="chat-tag-close" onclick="clearChatFilter()" title="Сбросить фильтр чата">✕</span>
+    <span class="tag-close" onclick="clearChatFilter()" title="Сбросить фильтр чата">✕</span>
   </div>
+
   <button id="resetAllBtn" class="reset-btn" onclick="resetAllFilters()" style="display:none">Сбросить всё</button>
 </div>
 
@@ -513,6 +516,7 @@ let currentFilter = urlParams.get('filter') || 'all';
 let currentChat = urlParams.get('chat') || '';
 let currentChatTitle = urlParams.get('chat_title') || '';
 let currentDate = urlParams.get('date') || '';
+let currentDateLabel = urlParams.get('date_label') || '';
 
 const showingOrig = new Set();
 let currentAudio = null;
@@ -527,7 +531,9 @@ updateChatTagUI();
 const monthsGen = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
 function formatDateLabel(val) {
-  if (!val) return 'Дата';
+  if (!val) return '';
+  if (val === 'today') return 'Сегодня';
+  if (val === 'yesterday') return 'Вчера';
   const parts = val.split('-');
   if (parts.length === 3) {
     const d = parseInt(parts[2], 10);
@@ -539,50 +545,46 @@ function formatDateLabel(val) {
 }
 
 function updateDateUI() {
-  const pill = document.getElementById('datePill');
-  const label = document.getElementById('dateLabel');
-  const clearBtn = document.getElementById('dateClearBtn');
-  const input = document.getElementById('dateInput');
-  if (currentDate) {
-    pill.classList.add('active');
-    label.textContent = formatDateLabel(currentDate);
-    clearBtn.style.display = 'inline-flex';
-    if (input) input.value = currentDate;
+  const pillToday = document.getElementById('pillToday');
+  const pillYesterday = document.getElementById('pillYesterday');
+  const tag = document.getElementById('dateFilterTag');
+  const name = document.getElementById('dateFilterName');
+
+  if (pillToday) pillToday.classList.toggle('active', currentDate === 'today');
+  if (pillYesterday) pillYesterday.classList.toggle('active', currentDate === 'yesterday');
+
+  if (currentDate && currentDate !== 'today' && currentDate !== 'yesterday') {
+    tag.style.display = 'inline-flex';
+    name.textContent = currentDateLabel || formatDateLabel(currentDate);
   } else {
-    pill.classList.remove('active');
-    label.textContent = 'Дата';
-    clearBtn.style.display = 'none';
-    if (input) input.value = '';
+    tag.style.display = 'none';
   }
 }
 
-function openDatePicker() {
-  const input = document.getElementById('dateInput');
-  if (!input) return;
-  try {
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-    } else {
-      input.click();
-    }
-  } catch (e) {
-    input.click();
+function toggleQuickDate(mode) {
+  if (currentDate === mode) {
+    currentDate = '';
+    currentDateLabel = '';
+  } else {
+    currentDate = mode;
+    currentDateLabel = (mode === 'today') ? 'Сегодня' : 'Вчера';
   }
-}
-
-function onDateSelected(val) {
-  currentDate = val;
   updateDateUI();
   updateURL();
   fetchRows(true);
 }
 
-function clearDate(e) {
-  if (e) {
-    e.stopPropagation();
-    e.preventDefault();
-  }
+function filterDate(dateStr, label) {
+  currentDate = dateStr;
+  currentDateLabel = label || formatDateLabel(dateStr);
+  updateDateUI();
+  updateURL();
+  fetchRows(true);
+}
+
+function clearDateFilter() {
   currentDate = '';
+  currentDateLabel = '';
   updateDateUI();
   updateURL();
   fetchRows(true);
@@ -616,7 +618,10 @@ function updateURL() {
     p.set('chat', currentChat);
     if (currentChatTitle) p.set('chat_title', currentChatTitle);
   }
-  if (currentDate) p.set('date', currentDate);
+  if (currentDate) {
+    p.set('date', currentDate);
+    if (currentDateLabel) p.set('date_label', currentDateLabel);
+  }
   const newRel = location.pathname + (p.toString() ? '?' + p.toString() : '');
   history.replaceState(null, '', newRel);
   updateChatTagUI();
@@ -635,8 +640,9 @@ function onSearchInput(val) {
 function setFilter(f) {
   currentFilter = f;
   if (f === 'all') {
-    // Мгновенный сброс даты и чата при переходе на "Все", чтобы сразу отобразились все сообщения без задержки
+    // Мгновенный сброс даты и чата при переходе на "Все", чтобы сразу отобразились все сообщения
     currentDate = '';
+    currentDateLabel = '';
     currentChat = '';
     currentChatTitle = '';
     updateDateUI();
@@ -666,6 +672,7 @@ function resetAllFilters() {
   currentChat = '';
   currentChatTitle = '';
   currentDate = '';
+  currentDateLabel = '';
   document.getElementById('searchInput').value = '';
   updateDateUI();
   updatePillsUI();
@@ -699,8 +706,13 @@ function applyAppleEmojis(root) {
 applyAppleEmojis(document.getElementById('tb'));
 
 let isFetching = false;
+let currentAbortController = null;
 async function fetchRows(force = false) {
   if (isFetching && !force) return;
+  if (force && currentAbortController) {
+    currentAbortController.abort();
+  }
+  currentAbortController = new AbortController();
   isFetching = true;
   try {
     const p = new URLSearchParams();
@@ -709,7 +721,7 @@ async function fetchRows(force = false) {
     if (currentChat) p.set('chat', currentChat);
     if (currentDate) p.set('date', currentDate);
 
-    const res = await fetch('/rows?' + p.toString());
+    const res = await fetch('/rows?' + p.toString(), { signal: currentAbortController.signal });
     const html = await res.text();
     const tb = document.getElementById('tb');
     if (force || tb.innerHTML !== html) {
@@ -732,7 +744,7 @@ async function fetchRows(force = false) {
           }
         });
       }
-      applyAppleEmojis(tb);
+      requestAnimationFrame(() => applyAppleEmojis(tb));
     }
   } catch(e) {
   } finally {
@@ -871,8 +883,23 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
     """
     args = []
     if q:
-        sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ?)"
-        args.extend([f"%{q}%"] * 5)
+        date_q = None
+        parts = q.strip().split(".")
+        if len(parts) == 3 and all(p.isdigit() for p in parts):
+            d_p, m_p, y_p = parts
+            if len(y_p) == 4 and len(d_p) <= 2 and len(m_p) <= 2:
+                date_q = f"{y_p}-{int(m_p):02d}-{int(d_p):02d}"
+        elif len(parts) == 2 and all(p.isdigit() for p in parts):
+            d_p, m_p = parts
+            if len(d_p) <= 2 and len(m_p) <= 2:
+                date_q = f"-{int(m_p):02d}-{int(d_p):02d}"
+
+        if date_q:
+            sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ? OR date LIKE ?)"
+            args.extend([f"%{q}%"] * 5 + [f"%{date_q}%"])
+        else:
+            sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ? OR date LIKE ?)"
+            args.extend([f"%{q}%"] * 5 + [f"%{q}%"])
 
     if filter_type == "deleted":
         sql += " AND is_deleted = 1"
@@ -886,16 +913,33 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         args.append(chat_id)
 
     if date_str:
-        try:
-            dt_local = datetime.strptime(date_str, "%Y-%m-%d").astimezone()
-            dt_local_end = dt_local + timedelta(days=1)
-            utc_start = dt_local.astimezone(timezone.utc).isoformat()
-            utc_end = dt_local_end.astimezone(timezone.utc).isoformat()
+        now_local = datetime.now().astimezone()
+        today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        if date_str == "today":
+            dt_start = today_start
+            dt_end = today_start + timedelta(days=1)
+            utc_start = dt_start.astimezone(timezone.utc).isoformat()
+            utc_end = dt_end.astimezone(timezone.utc).isoformat()
             sql += " AND date >= ? AND date < ?"
             args.extend([utc_start, utc_end])
-        except Exception:
-            sql += " AND date LIKE ?"
-            args.append(f"{date_str}%")
+        elif date_str == "yesterday":
+            dt_start = today_start - timedelta(days=1)
+            dt_end = today_start
+            utc_start = dt_start.astimezone(timezone.utc).isoformat()
+            utc_end = dt_end.astimezone(timezone.utc).isoformat()
+            sql += " AND date >= ? AND date < ?"
+            args.extend([utc_start, utc_end])
+        else:
+            try:
+                dt_local = datetime.strptime(date_str, "%Y-%m-%d").astimezone()
+                dt_local_end = dt_local + timedelta(days=1)
+                utc_start = dt_local.astimezone(timezone.utc).isoformat()
+                utc_end = dt_local_end.astimezone(timezone.utc).isoformat()
+                sql += " AND date >= ? AND date < ?"
+                args.extend([utc_start, utc_end])
+            except Exception:
+                sql += " AND date LIKE ?"
+                args.append(f"{date_str}%")
 
     out = []
 
@@ -944,10 +988,12 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         # 3. Разделитель дня
         if curr_day != last_day:
             day_label = f"{d.day} {MONTHS_GEN.get(curr_month, '')}"
+            iso_day = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
+            day_label_attr = html.escape(day_label.replace("'", "\\'"), True)
             out.append(
                 f'<tr class="sep-row"><td colspan="4">'
                 f'<div class="sep-day">'
-                f'<span class="sep-day-text">{day_label}</span>'
+                f'<span class="sep-day-text" onclick="filterDate(\'{iso_day}\', \'{day_label_attr}\')" title="Показать только сообщения за {day_label}">{day_label}</span>'
                 f'<div class="sep-day-line"></div>'
                 f'</div>'
                 f'</td></tr>'
