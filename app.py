@@ -52,6 +52,16 @@ AV.mkdir(exist_ok=True)
 MEDIA = Path("media")
 MEDIA.mkdir(exist_ok=True)
 
+MONTHS_NOM = {
+    1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель", 5: "Май", 6: "Июнь",
+    7: "Июль", 8: "Август", 9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
+}
+
+MONTHS_GEN = {
+    1: "января", 2: "февраля", 3: "марта", 4: "апреля", 5: "мая", 6: "июня",
+    7: "июля", 8: "августа", 9: "сентября", 10: "октября", 11: "ноября", 12: "декабря"
+}
+
 # ---------- БД ----------
 db = sqlite3.connect("logs.db", check_same_thread=False)
 db.execute("""CREATE TABLE IF NOT EXISTS logs(
@@ -324,7 +334,7 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .w{max-width:1200px;margin:0 auto;padding:16px}
 
 /* Панель фильтров */
-.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px}
 .search-box{flex:1;min-width:240px}
 .search-box input{width:100%;box-sizing:border-box;margin-bottom:0;padding:10px 14px;background:#141414;color:#fff;
  border:1px solid #222;border-radius:6px;font:inherit;outline:none;transition:border-color 0.15s}
@@ -342,11 +352,60 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .reset-btn:hover{color:#aaa}
 
 table{width:100%;border-collapse:collapse}
-tr:nth-child(odd){background:#0d0d0d} tr:nth-child(even){background:#141414} tr:hover{background:#202020}
+
+/* Разделители по датам */
+tr.sep-row td{padding:0;background:#0a0a0a !important}
+tr.sep-row:hover td{background:#0a0a0a !important}
+
+.sep-year{
+  font-size:22px;
+  font-weight:700;
+  color:#fff;
+  letter-spacing:-0.02em;
+  padding:32px 4px 10px;
+  border-bottom:1px solid #222;
+}
+
+.sep-month{
+  font-size:16px;
+  font-weight:600;
+  color:#a3a3a3;
+  padding:22px 6px 8px;
+}
+
+.sep-day{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 6px 8px;
+}
+
+.sep-day-text{
+  background:#161616;
+  color:#ccc;
+  border:1px solid #2a2a2a;
+  padding:3px 12px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:500;
+  white-space:nowrap;
+}
+
+.sep-day-line{
+  flex:1;
+  height:1px;
+  background:#1e1e1e;
+}
+
+/* Строки сообщений и зебра */
+tr.row-odd{background:#0d0d0d}
+tr.row-even{background:#141414}
+tr.row-odd:hover, tr.row-even:hover{background:#202020}
+
 td{padding:10px 14px;vertical-align:top}
 .n{width:50px;color:#666;font-size:13px;font-weight:400}
 .t{white-space:pre-wrap;word-break:break-word}
-.d{width:110px;color:#9a9a9a;font-weight:400;white-space:nowrap}
+.d{width:80px;color:#9a9a9a;font-weight:400;white-space:nowrap;font-size:13px}
 .s{width:330px}.s div{display:flex;align-items:center;gap:8px}
 .s img,.s i{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;
  font:600 12px/22px 'Onest',sans-serif;text-align:center;color:#aaa}
@@ -751,10 +810,54 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         '</svg>'
     )
 
+    last_year = None
+    last_month = None
+    last_day = None
+    row_idx = 0
+
     for i, _, cid, title, uname, text, date, av, rep_text, media, is_del, orig_text, is_edit, rep_media in db.execute(
         sql + " ORDER BY id DESC LIMIT ?", args + [limit]
     ):
         d = datetime.fromisoformat(date).astimezone()
+        curr_year = d.year
+        curr_month = d.month
+        curr_day = (d.year, d.month, d.day)
+
+        # 1. Разделитель года
+        if curr_year != last_year:
+            out.append(
+                f'<tr class="sep-row"><td colspan="4">'
+                f'<div class="sep-year">{curr_year}</div>'
+                f'</td></tr>'
+            )
+            last_year = curr_year
+            last_month = None
+            last_day = None
+
+        # 2. Разделитель месяца
+        if curr_month != last_month:
+            m_name = MONTHS_NOM.get(curr_month, "")
+            out.append(
+                f'<tr class="sep-row"><td colspan="4">'
+                f'<div class="sep-month">{m_name}</div>'
+                f'</td></tr>'
+            )
+            last_month = curr_month
+            last_day = None
+
+        # 3. Разделитель дня
+        if curr_day != last_day:
+            day_label = f"{d.day} {MONTHS_GEN.get(curr_month, '')}"
+            out.append(
+                f'<tr class="sep-row"><td colspan="4">'
+                f'<div class="sep-day">'
+                f'<span class="sep-day-text">{day_label}</span>'
+                f'<div class="sep-day-line"></div>'
+                f'</div>'
+                f'</td></tr>'
+            )
+            last_day = curr_day
+
         title_clean = title or "Без имени"
         title_esc = html.escape(title_clean)
         title_attr = html.escape(title_clean.replace("'", "\\'"), True)
@@ -802,9 +905,12 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         if is_del:
             content_html += ' <span class="del-badge">удалено</span>'
 
+        row_cls = "row-odd" if row_idx % 2 == 0 else "row-even"
+        row_idx += 1
+
         out.append(
-            f"<tr><td class=n>{i}</td><td class=t>{content_html}</td>"
-            f"<td class=d>{d:%d.%m.%Y}<br>{d:%H:%M}</td>"
+            f"<tr class='{row_cls}'><td class=n>{i}</td><td class=t>{content_html}</td>"
+            f"<td class=d title='{d:%d.%m.%Y %H:%M}'>{d:%H:%M}</td>"
             f"<td class=s><div>{ava_clickable}{chat_link}{un}</div></td></tr>"
         )
 
