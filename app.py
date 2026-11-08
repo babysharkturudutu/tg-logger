@@ -639,6 +639,14 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
   align-items:flex-start;
   padding:0;
   box-sizing:border-box;
+  opacity:1;
+  transform:translateY(0) scaleY(1);
+  transform-origin:top;
+  transition:max-height 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+             opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+             padding 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow:hidden;
 }
 .msg-row > div{
   padding:10px 14px;
@@ -649,6 +657,74 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .msg-row:hover{background:none}
 .msg-row.row-odd:hover{background:#0d0d0d}
 .msg-row.row-even:hover{background:#141414}
+
+/* Плавная анимация ухода строк при фильтрации */
+.msg-row.row-exit{
+  max-height:0 !important;
+  opacity:0 !important;
+  transform:translateY(-6px) scaleY(0.85) !important;
+  padding-top:0 !important;
+  padding-bottom:0 !important;
+  pointer-events:none !important;
+}
+
+/* Плавное появление строк при сбросе/возвращении категорий */
+@keyframes rowEnterAnim{
+  0%{
+    opacity:0;
+    transform:translateY(10px);
+    max-height:0;
+  }
+  30%{
+    opacity:0.4;
+    max-height:300px;
+  }
+  100%{
+    opacity:1;
+    transform:translateY(0);
+    max-height:1000px;
+  }
+}
+.msg-row.row-enter{
+  animation:rowEnterAnim 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Плавный уход и появление групп дат */
+.group-day, .group-month, .group-year{
+  opacity:1;
+  transform:translateY(0);
+  transition:max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+             opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.group-day.group-exit, .group-month.group-exit, .group-year.group-exit{
+  max-height:0 !important;
+  opacity:0 !important;
+  overflow:hidden !important;
+  transform:translateY(-8px) !important;
+  pointer-events:none !important;
+  padding-top:0 !important;
+  padding-bottom:0 !important;
+  margin-top:0 !important;
+  margin-bottom:0 !important;
+}
+@keyframes groupEnterAnim{
+  0%{
+    opacity:0;
+    transform:translateY(8px);
+  }
+  100%{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+.group-day.group-enter, .group-month.group-enter, .group-year.group-enter{
+  animation:groupEnterAnim 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.empty-feed.row-enter{
+  animation:groupEnterAnim 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
 /* Пустое состояние */
 .empty-feed{
@@ -832,28 +908,109 @@ function updateDateUI() {
   updateChatTagUI();
 }
 
+function getIsoDate(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Плавная анимация ухода строк, не подходящих под категорию
+function applyFilterAnimation(filterType, val) {
+  if (filterType === 'clear' || (filterType === 'tab' && val === 'all')) {
+    document.querySelectorAll('.row-exit, .group-exit').forEach(el => {
+      el.classList.remove('row-exit', 'group-exit');
+    });
+    return;
+  }
+
+  let targetDay = val;
+  if (filterType === 'quick_date') {
+    targetDay = (val === 'today') ? getIsoDate(0) : getIsoDate(1);
+  }
+
+  const rows = document.querySelectorAll('.msg-row');
+  rows.forEach(r => {
+    let match = true;
+    if (filterType === 'date' || filterType === 'quick_date') {
+      match = (r.getAttribute('data-msg-day') === targetDay);
+    } else if (filterType === 'chat') {
+      match = (r.getAttribute('data-chat-id') === String(val));
+    } else if (filterType === 'tab') {
+      if (val === 'deleted') match = (r.getAttribute('data-is-del') === '1');
+      else if (val === 'edited') match = (r.getAttribute('data-is-edit') === '1');
+      else if (val === 'media') match = (r.getAttribute('data-has-media') === '1');
+    }
+
+    if (!match) {
+      r.classList.add('row-exit');
+    } else {
+      r.classList.remove('row-exit');
+    }
+  });
+
+  // Проверяем группы дней
+  document.querySelectorAll('.group-day').forEach(grp => {
+    const allRows = grp.querySelectorAll('.msg-row');
+    const exitRows = grp.querySelectorAll('.msg-row.row-exit');
+    if (allRows.length > 0 && allRows.length === exitRows.length) {
+      grp.classList.add('group-exit');
+    } else {
+      grp.classList.remove('group-exit');
+    }
+  });
+
+  // Проверяем группы месяцев
+  document.querySelectorAll('.group-month').forEach(grp => {
+    const allDays = grp.querySelectorAll('.group-day');
+    const exitDays = grp.querySelectorAll('.group-day.group-exit');
+    if (allDays.length > 0 && allDays.length === exitDays.length) {
+      grp.classList.add('group-exit');
+    } else {
+      grp.classList.remove('group-exit');
+    }
+  });
+
+  // Проверяем группы лет
+  document.querySelectorAll('.group-year').forEach(grp => {
+    const allMonths = grp.querySelectorAll('.group-month');
+    const exitMonths = grp.querySelectorAll('.group-month.group-exit');
+    if (allMonths.length > 0 && allMonths.length === exitMonths.length) {
+      grp.classList.add('group-exit');
+    } else {
+      grp.classList.remove('group-exit');
+    }
+  });
+}
+
 function toggleQuickDate(mode) {
   if (currentDate === mode) {
+    applyFilterAnimation('clear');
     currentDate = '';
     currentDateLabel = '';
   } else {
     currentDate = mode;
     currentDateLabel = (mode === 'today') ? 'Сегодня' : 'Вчера';
+    applyFilterAnimation('quick_date', mode);
   }
   updateDateUI();
   updateURL();
-  fetchRows(true);
+  setTimeout(() => fetchRows(true), 160);
 }
 
 function filterDate(dateStr, label) {
+  applyFilterAnimation('date', dateStr);
   currentDate = dateStr;
   currentDateLabel = label || formatDateLabel(dateStr);
   updateDateUI();
   updateURL();
-  fetchRows(true);
+  setTimeout(() => fetchRows(true), 160);
 }
 
 function clearDateFilter() {
+  applyFilterAnimation('clear');
   currentDate = '';
   currentDateLabel = '';
   updateDateUI();
@@ -913,20 +1070,27 @@ function onSearchInput(val) {
 }
 
 function setFilter(f) {
+  if (f === 'all') {
+    applyFilterAnimation('clear');
+  } else {
+    applyFilterAnimation('tab', f);
+  }
   currentFilter = f;
   updatePillsUI();
   updateURL();
-  fetchRows(true);
+  setTimeout(() => fetchRows(true), 160);
 }
 
 function filterChat(cid, title) {
+  applyFilterAnimation('chat', cid);
   currentChat = String(cid);
   currentChatTitle = title || '';
   updateURL();
-  fetchRows(true);
+  setTimeout(() => fetchRows(true), 160);
 }
 
 function clearChatFilter() {
+  applyFilterAnimation('clear');
   currentChat = '';
   currentChatTitle = '';
   updateURL();
@@ -934,6 +1098,7 @@ function clearChatFilter() {
 }
 
 function resetAllFilters() {
+  applyFilterAnimation('clear');
   currentQ = '';
   currentFilter = 'all';
   currentChat = '';
@@ -1033,6 +1198,70 @@ applyCollapsedState();
 let fetchSeq = 0;
 let currentAbortController = null;
 
+function restoreUIState() {
+  showingOrig.forEach(id => {
+    const el = document.getElementById('text-' + id);
+    const btn = document.getElementById('btn-' + id);
+    if(el && btn){
+      el.innerHTML = el.getAttribute('data-orig-html') || '';
+      el.classList.add('is-orig');
+      btn.classList.add('active');
+      btn.textContent = 'после изменения';
+    }
+  });
+  if(currentAudio && !currentAudio.paused){
+    document.querySelectorAll('.voice-box').forEach(box => {
+      const btn = box.querySelector('.voice-btn');
+      if(btn && btn.getAttribute('data-src') === currentAudioSrc){
+        btn.textContent = '⏸';
+      }
+    });
+  }
+}
+
+function updateFeedHTML(newHtml, isFilterTransition = false) {
+  const tb = document.getElementById('tb');
+  if (!tb) return;
+
+  if (!isFilterTransition) {
+    tb.innerHTML = newHtml;
+    applyCollapsedState();
+    restoreUIState();
+    return;
+  }
+
+  // Фиксируем ID строк, которые уже были видны до обновления
+  const existingRowIds = new Set();
+  tb.querySelectorAll('.msg-row[id]:not(.row-exit)').forEach(r => existingRowIds.add(r.id));
+  const existingDayIds = new Set();
+  tb.querySelectorAll('.group-day[id]:not(.group-exit)').forEach(g => existingDayIds.add(g.id));
+
+  // Парсим входящий HTML
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<div id="root">' + newHtml + '</div>', 'text/html');
+  const newRoot = doc.getElementById('root');
+
+  // Добавляем класс мягкого входа для строк, которых не было на экране
+  newRoot.querySelectorAll('.msg-row[id]').forEach(r => {
+    if (!existingRowIds.has(r.id)) {
+      r.classList.add('row-enter');
+    }
+  });
+
+  newRoot.querySelectorAll('.group-day[id]').forEach(g => {
+    if (!existingDayIds.has(g.id)) {
+      g.classList.add('group-enter');
+    }
+  });
+
+  const emptyFeed = newRoot.querySelector('.empty-feed');
+  if (emptyFeed) emptyFeed.classList.add('row-enter');
+
+  tb.innerHTML = newRoot.innerHTML;
+  applyCollapsedState();
+  restoreUIState();
+}
+
 async function fetchRows(force = false) {
   const seq = ++fetchSeq;
   if (currentAbortController) {
@@ -1059,26 +1288,7 @@ async function fetchRows(force = false) {
 
     const tb = document.getElementById('tb');
     if (force || tb.innerHTML !== html) {
-      tb.innerHTML = html;
-      applyCollapsedState();
-      showingOrig.forEach(id => {
-        const el = document.getElementById('text-' + id);
-        const btn = document.getElementById('btn-' + id);
-        if(el && btn){
-          el.innerHTML = el.getAttribute('data-orig-html') || '';
-          el.classList.add('is-orig');
-          btn.classList.add('active');
-          btn.textContent = 'после изменения';
-        }
-      });
-      if(currentAudio && !currentAudio.paused){
-        document.querySelectorAll('.voice-box').forEach(box => {
-          const btn = box.querySelector('.voice-btn');
-          if(btn && btn.getAttribute('data-src') === currentAudioSrc){
-            btn.textContent = '⏸';
-          }
-        });
-      }
+      updateFeedHTML(html, force);
     }
   } catch(e) {
   }
@@ -1452,8 +1662,13 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         row_cls = "row-odd" if row_idx % 2 == 0 else "row-even"
         row_idx += 1
 
+        data_chat_id = cid or ""
+        data_is_del = 1 if is_del else 0
+        data_is_edit = 1 if is_edit else 0
+        data_has_media = 1 if (media or rep_media) else 0
+
         out.append(
-            f"<div class='{row_cls} msg-row' data-msg-year='{curr_year}' data-msg-month='{month_key}' data-msg-day='{iso_day}'>"
+            f"<div class='{row_cls} msg-row' id='row-{i}' data-msg-year='{curr_year}' data-msg-month='{month_key}' data-msg-day='{iso_day}' data-chat-id='{data_chat_id}' data-is-del='{data_is_del}' data-is-edit='{data_is_edit}' data-has-media='{data_has_media}'>"
             f"<div class=n>{i}</div><div class=t>{content_html}</div>"
             f"<div class=d title='{d:%d.%m.%Y %H:%M}'>{d:%H:%M}</div>"
             f"<div class=s><div class='s-wrap'>{ava_clickable}{meta_html}</div></div></div>"
