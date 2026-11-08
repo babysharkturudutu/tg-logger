@@ -346,14 +346,81 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .pill:hover{background:#1a1a1a;color:#ccc;border-color:#333}
 .pill.active{background:#262626;color:#fff;border-color:#4a4a4a}
 
-.filter-tag{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:6px 12px;font-size:13px;font-weight:500;height:42px;box-sizing:border-box}
-.chat-tag{background:#142218;color:#4ade80;border:1px solid #22542e}
-.date-tag{background:#1a1926;color:#c4b5fd;border:1px solid #3b3563}
+.filter-tag{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border-radius:6px;
+  font-size:13px;
+  font-weight:500;
+  height:42px;
+  box-sizing:border-box;
+  white-space:nowrap;
+  overflow:hidden;
+  max-width:0;
+  opacity:0;
+  padding:0;
+  margin-left:-8px;
+  border:0 solid transparent;
+  transform:translateX(16px);
+  pointer-events:none;
+  transition:max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             padding 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             margin-left 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             border-color 0.2s;
+}
+.filter-tag.visible{
+  max-width:320px;
+  opacity:1;
+  padding:6px 12px;
+  margin-left:0;
+  border-width:1px;
+  transform:translateX(0);
+  pointer-events:auto;
+}
+.chat-tag{background:#142218;color:#4ade80;border-style:solid;border-color:#22542e}
+.date-tag{background:#1a1926;color:#c4b5fd;border-style:solid;border-color:#3b3563}
 .tag-close{cursor:pointer;opacity:0.75;font-weight:700;margin-left:4px;padding:0 2px}
 .tag-close:hover{opacity:1;color:#fff}
 
-.reset-btn{background:none;border:none;color:#666;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;padding:6px 10px;height:42px}
+.reset-btn{
+  background:none;
+  border:none;
+  color:#666;
+  font:inherit;
+  font-size:13px;
+  cursor:pointer;
+  text-decoration:underline;
+  height:42px;
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  white-space:nowrap;
+  overflow:hidden;
+  max-width:0;
+  opacity:0;
+  padding:0;
+  margin-left:-8px;
+  transform:translateX(16px);
+  pointer-events:none;
+  transition:max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             padding 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             margin-left 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             color 0.15s;
+}
 .reset-btn:hover{color:#aaa}
+.reset-btn.visible{
+  max-width:130px;
+  opacity:1;
+  padding:6px 10px;
+  margin-left:0;
+  transform:translateX(0);
+  pointer-events:auto;
+}
 
 table{width:100%;border-collapse:collapse}
 
@@ -492,17 +559,17 @@ td{padding:10px 14px;vertical-align:top}
     <button id="pillYesterday" class="pill" onclick="toggleQuickDate('yesterday')">Вчера</button>
   </div>
 
-  <div id="dateFilterTag" class="filter-tag date-tag" style="display:none">
+  <div id="dateFilterTag" class="filter-tag date-tag">
     <span>📅</span> <span id="dateFilterName"></span>
     <span class="tag-close" onclick="clearDateFilter()" title="Сбросить фильтр даты">✕</span>
   </div>
 
-  <div id="chatFilterTag" class="filter-tag chat-tag" style="display:none">
+  <div id="chatFilterTag" class="filter-tag chat-tag">
     <span>Чат:</span> <span id="chatFilterName"></span>
     <span class="tag-close" onclick="clearChatFilter()" title="Сбросить фильтр чата">✕</span>
   </div>
 
-  <button id="resetAllBtn" class="reset-btn" onclick="resetAllFilters()" style="display:none">Сбросить всё</button>
+  <button id="resetAllBtn" class="reset-btn" onclick="resetAllFilters()">Сбросить всё</button>
 </div>
 
 <table><tbody id="tb">%ROWS%</tbody></table></div>
@@ -554,10 +621,10 @@ function updateDateUI() {
   if (pillYesterday) pillYesterday.classList.toggle('active', currentDate === 'yesterday');
 
   if (currentDate && currentDate !== 'today' && currentDate !== 'yesterday') {
-    tag.style.display = 'inline-flex';
     name.textContent = currentDateLabel || formatDateLabel(currentDate);
+    tag.classList.add('visible');
   } else {
-    tag.style.display = 'none';
+    tag.classList.remove('visible');
   }
 }
 
@@ -601,13 +668,17 @@ function updateChatTagUI() {
   const name = document.getElementById('chatFilterName');
   const resetBtn = document.getElementById('resetAllBtn');
   if (currentChat) {
-    tag.style.display = 'inline-flex';
     name.textContent = currentChatTitle || ('ID: ' + currentChat);
+    tag.classList.add('visible');
   } else {
-    tag.style.display = 'none';
+    tag.classList.remove('visible');
   }
   const hasFilter = currentQ || currentFilter !== 'all' || currentChat || currentDate;
-  resetBtn.style.display = hasFilter ? 'inline-block' : 'none';
+  if (hasFilter) {
+    resetBtn.classList.add('visible');
+  } else {
+    resetBtn.classList.remove('visible');
+  }
 }
 
 function updateURL() {
