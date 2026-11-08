@@ -110,12 +110,15 @@ db.commit()
 
 # Добавляем новые колонки при необходимости
 for col in [
-    "reply_text TEXT", 
-    "media_file TEXT", 
-    "is_deleted INTEGER DEFAULT 0", 
-    "orig_text TEXT", 
+    "reply_text TEXT",
+    "media_file TEXT",
+    "is_deleted INTEGER DEFAULT 0",
+    "orig_text TEXT",
     "is_edited INTEGER DEFAULT 0",
-    "reply_media_file TEXT"
+    "reply_media_file TEXT",
+    "sender_name TEXT",
+    "sender_username TEXT",
+    "sender_id INTEGER"
 ]:
     try:
         db.execute(f"ALTER TABLE logs ADD COLUMN {col}")
@@ -242,10 +245,22 @@ async def on_message(event):
     if not text and not media_file:
         return
 
+        sender_name = None
+    sender_username = None
+    sender_id = m.sender_id
+    if not event.is_private:
+        try:
+            sender = await m.get_sender()
+            if sender:
+                sender_name = utils.get_display_name(sender)
+                sender_username = getattr(sender, "username", None)
+        except Exception:
+            pass
+
     title, username, avatar = await chat_info(event)
     db.execute(
-        "INSERT INTO logs(msg_id,chat_id,chat_title,chat_username,text,date,avatar,reply_text,media_file,is_deleted,orig_text,is_edited,reply_media_file) "
-        "VALUES(?,?,?,?,?,?,?,?,?,0,NULL,0,?)",
+        "INSERT INTO logs(msg_id,chat_id,chat_title,chat_username,text,date,avatar,reply_text,media_file,is_deleted,orig_text,is_edited,reply_media_file,sender_name,sender_username,sender_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,0,NULL,0,?,?,?,?)",
         (
             m.id,
             event.chat_id,
@@ -257,6 +272,9 @@ async def on_message(event):
             reply_text,
             media_file,
             reply_media_file,
+            sender_name,
+            sender_username,
+            sender_id,
         ),
     )
     db.commit()
@@ -305,11 +323,23 @@ async def on_edited(event):
             except Exception:
                 return
 
+                sender_name = None
+        sender_username = None
+        sender_id = m.sender_id
+        if not event.is_private:
+            try:
+                sender = await m.get_sender()
+                if sender:
+                    sender_name = utils.get_display_name(sender)
+                    sender_username = getattr(sender, "username", None)
+            except Exception:
+                pass
+
         media_file = await download_msg_media(m, prefix="")
         title, username, avatar = await chat_info(event)
         db.execute(
-            "INSERT INTO logs(msg_id,chat_id,chat_title,chat_username,text,date,avatar,reply_text,media_file,is_deleted,orig_text,is_edited,reply_media_file) "
-            "VALUES(?,?,?,?,?,?,?,?,?,0,?,1,?)",
+            "INSERT INTO logs(msg_id,chat_id,chat_title,chat_username,text,date,avatar,reply_text,media_file,is_deleted,orig_text,is_edited,reply_media_file,sender_name,sender_username,sender_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?,0,?,1,?,?,?,?)",
             (
                 m.id,
                 event.chat_id,
@@ -322,6 +352,9 @@ async def on_edited(event):
                 media_file,
                 "[текст до запуска]",
                 reply_media_file,
+                sender_name,
+                sender_username,
+                sender_id,
             ),
         )
         db.commit()
@@ -494,37 +527,53 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
   flex-shrink:0;
   opacity:0.6;
 }
+.sep-year-wrap{
+  padding:28px 4px 10px;
+  border-bottom:1px solid #222;
+  display:flex;
+  align-items:center;
+}
 .sep-year{
   font-size:22px;
   font-weight:700;
   color:#fff;
   letter-spacing:-0.02em;
-  padding:32px 4px 10px;
-  border-bottom:1px solid #222;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  user-select:none;
-  transition:color 0.15s;
-}
-.sep-year:hover{color:#e5e5e5}
-.sep-year:hover .chevron-svg{opacity:1;color:#fff}
-.sep-year.collapsed .chevron-svg{transform:rotate(-90deg)}
-
-.sep-month{
-  font-size:16px;
-  font-weight:600;
-  color:#a3a3a3;
-  padding:22px 6px 8px;
   cursor:pointer;
   display:inline-flex;
   align-items:center;
   gap:8px;
   user-select:none;
-  transition:color 0.15s;
+  transition:color 0.15s, background-color 0.15s;
+  width:fit-content;
+  padding:2px 8px;
+  margin-left:-8px;
+  border-radius:6px;
 }
-.sep-month:hover{color:#fff}
+.sep-year:hover{color:#e5e5e5;background:#181818}
+.sep-year:hover .chevron-svg{opacity:1;color:#fff}
+.sep-year.collapsed .chevron-svg{transform:rotate(-90deg)}
+
+.sep-month-wrap{
+  padding:20px 4px 6px;
+  display:flex;
+  align-items:center;
+}
+.sep-month{
+  font-size:16px;
+  font-weight:600;
+  color:#a3a3a3;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  user-select:none;
+  transition:color 0.15s, background-color 0.15s;
+  width:fit-content;
+  padding:2px 6px;
+  margin-left:-6px;
+  border-radius:6px;
+}
+.sep-month:hover{color:#fff;background:#181818}
 .sep-month:hover .chevron-svg{opacity:1;color:#fff}
 .sep-month.collapsed .chevron-svg{transform:rotate(-90deg)}
 
@@ -612,22 +661,28 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .n{width:50px;flex-shrink:0;color:#666;font-size:13px;font-weight:400;line-height:1.45;padding-top:12px !important}
 .t{flex:1 1 0%;min-width:0;white-space:pre-wrap;word-break:break-word}
 .d{width:80px;flex-shrink:0;color:#8a8a8a;font-weight:400;white-space:nowrap;font-size:13px;line-height:1.45;padding-top:12px !important;font-variant-numeric:tabular-nums}
-.s{width:330px;flex-shrink:0}.s div{display:flex;align-items:center;gap:8px}
-.s a.ava-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;text-decoration:none}
+.s{width:330px;flex-shrink:0}
+.s .s-wrap{display:flex;align-items:flex-start;gap:8px}
+.s a.ava-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;text-decoration:none;margin-top:1px}
 .s img{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;display:block;aspect-ratio:1/1}
 .s i{width:22px;height:22px;flex:none;border-radius:50%;background:#262626;border:1px solid #383838;
  display:inline-flex;align-items:center;justify-content:center;font:600 11px/1 'Onest',sans-serif;font-style:normal;
  text-align:center;color:#ccc;box-sizing:border-box;user-select:none;aspect-ratio:1/1}
-.s a{color:#bbb;text-decoration:none;font-weight:500;cursor:pointer;transition:color 0.15s}
-.s a:hover{color:#fff;text-decoration:underline}
-.s span{color:#777;font-weight:400}
+.s .s-info{display:flex;flex-direction:column;min-width:0;gap:2px}
+.s .s-chat-row{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;line-height:1.3}
+.s a.chat-name-link{color:#bbb;text-decoration:none;font-weight:500;cursor:pointer;transition:color 0.15s;font-size:13px}
+.s a.chat-name-link:hover{color:#fff;text-decoration:underline}
+.s span.chat-un{color:#777;font-weight:400;font-size:12px}
+.s .s-sender-row{display:flex;align-items:baseline;gap:4px;font-size:12px;color:#8a8a8a;line-height:1.3;flex-wrap:wrap}
+.s .s-sender-prefix{color:#555;font-weight:400;font-size:11px}
+.s .s-sender-name{color:#bbb;font-weight:500;font-size:12px}
+.s .s-sender-un{color:#666;font-weight:400;font-size:11px}
 
 /* Стили для реплаев (акцентный серый) */
 .reply-wrap{display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px}
 .reply-orig{background:#181818;color:#8a8a8a;padding:2px 8px;border-radius:4px;font-size:13px;
  border-left:3px solid #5a5a5a;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.reply-arrow{display:inline-block;vertical-align:middle;margin:0 6px;flex-shrink:0;opacity:0.75;transition:opacity 0.15s,transform 0.15s}
-.reply-wrap:hover .reply-arrow{opacity:1;transform:translateX(1px)}
+.reply-arrow{display:inline-block;vertical-align:middle;margin:0 6px;flex-shrink:0;opacity:0.75}
 .reply-text{
   display:inline-block;
   vertical-align:baseline;
@@ -1166,7 +1221,8 @@ def render_media_badge(media_file):
 def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
     sql = """
         SELECT id, msg_id, chat_id, chat_title, chat_username, text, date, avatar, 
-               reply_text, media_file, is_deleted, orig_text, is_edited, reply_media_file 
+               reply_text, media_file, is_deleted, orig_text, is_edited, reply_media_file, 
+               sender_name, sender_username, sender_id 
         FROM logs
         WHERE 1=1
     """
@@ -1184,11 +1240,11 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
                 date_q = f"-{int(m_p):02d}-{int(d_p):02d}"
 
         if date_q:
-            sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ? OR date LIKE ?)"
-            args.extend([f"%{q}%"] * 5 + [f"%{date_q}%"])
+            sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ? OR sender_name LIKE ? OR sender_username LIKE ? OR date LIKE ?)"
+            args.extend([f"%{q}%"] * 7 + [f"%{date_q}%"])
         else:
-            sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ? OR date LIKE ?)"
-            args.extend([f"%{q}%"] * 5 + [f"%{q}%"])
+            sql += " AND (text LIKE ? OR chat_title LIKE ? OR reply_text LIKE ? OR orig_text LIKE ? OR chat_username LIKE ? OR sender_name LIKE ? OR sender_username LIKE ? OR date LIKE ?)"
+            args.extend([f"%{q}%"] * 7 + [f"%{q}%"])
 
     if filter_type == "deleted":
         sql += " AND is_deleted = 1"
@@ -1249,7 +1305,7 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
     last_day = None
     row_idx = 0
 
-    for i, _, cid, title, uname, text, date, av, rep_text, media, is_del, orig_text, is_edit, rep_media in db.execute(
+    for i, _, cid, title, uname, text, date, av, rep_text, media, is_del, orig_text, is_edit, rep_media, s_name, s_uname, s_id in db.execute(
         sql + " ORDER BY id DESC LIMIT ?", args + [limit]
     ):
         d = datetime.fromisoformat(date).astimezone()
@@ -1272,8 +1328,10 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
 
             out.append(
                 f'<div class="group-year" id="grp-year-{curr_year}">'
+                f'<div class="sep-year-wrap">'
                 f'<div class="sep-year" id="hdr-year-{curr_year}" onclick="toggleCollapseYear({curr_year}, this, event)" title="Свернуть / развернуть {curr_year} год">'
                 f'<span>{curr_year}</span>{chevron_svg}'
+                f'</div>'
                 f'</div>'
                 f'<div class="accordion-body" id="body-year-{curr_year}"><div class="accordion-inner">'
             )
@@ -1292,8 +1350,10 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
             m_name = MONTHS_NOM.get(curr_month, "")
             out.append(
                 f'<div class="group-month" id="grp-month-{month_key}">'
-                f'<div class="sep-month" id="hdr-month-{month_key}" onclick="toggleCollapseMonth(\'{month_key}\', this, event)" title="Свернуть / развернуть {m_name}">'
+                f'<div class="sep-month-wrap">'
+                f'<div class="sep-month" id="hdr-month-{month_key}" onclick="toggleCollapseMonth(\'{month_key}\', this, event)" title="Свернуть / развернуть {m_name}">' 
                 f'<span>{m_name}</span>{chevron_svg}'
+                f'</div>'
                 f'</div>'
                 f'<div class="accordion-body" id="body-month-{month_key}"><div class="accordion-inner">'
             )
@@ -1322,12 +1382,32 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
 
         title_clean = title or "Без имени"
         title_esc = emoji_html(title_clean)
-        title_attr = html.escape(title_clean.replace("'", "\'"), True)
+        title_attr = html.escape(title_clean.replace("'", "\\'"), True)
 
         ava = f'<img src="/avatars/{av}">' if av else f"<i>{html.escape(title_clean[:1].upper())}</i>"
-        ava_clickable = f'<a href="javascript:void(0)" class="ava-link" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{ava}</a>'
-        chat_link = f'<a href="javascript:void(0)" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{title_esc}</a>'
-        un = f"<span>@{html.escape(uname)}</span>" if uname else ""
+        ava_clickable = f'<a href="javascript:void(0)" class="ava-link" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{ava}</a>' 
+        chat_link = f'<a href="javascript:void(0)" class="chat-name-link" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{title_esc}</a>' 
+        un = f"<span class='chat-un'>@{html.escape(uname)}</span>" if uname else ""
+
+        # Строка отправителя (если сообщение из группы и есть имя автора)
+        sender_row_html = ""
+        if s_name and (cid is not None and cid < 0):
+            s_name_esc = emoji_html(s_name)
+            s_un_esc = f"<span class='s-sender-un'>@{html.escape(s_uname)}</span>" if s_uname else ""
+            sender_row_html = (
+                f"<div class='s-sender-row'>"
+                f"<span class='s-sender-prefix'>от</span> "
+                f"<span class='s-sender-name'>{s_name_esc}</span>"
+                f"{s_un_esc}"
+                f"</div>"
+            )
+
+        meta_html = (
+            f"<div class='s-info'>"
+            f"<div class='s-chat-row'>{chat_link}{un}</div>"
+            f"{sender_row_html}"
+            f"</div>"
+        )
 
         curr_esc = emoji_html(text or "")
         orig_esc = emoji_html(orig_text or "")
@@ -1376,7 +1456,7 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
             f"<div class='{row_cls} msg-row' data-msg-year='{curr_year}' data-msg-month='{month_key}' data-msg-day='{iso_day}'>"
             f"<div class=n>{i}</div><div class=t>{content_html}</div>"
             f"<div class=d title='{d:%d.%m.%Y %H:%M}'>{d:%H:%M}</div>"
-            f"<div class=s><div>{ava_clickable}{chat_link}{un}</div></div></div>"
+            f"<div class=s><div class='s-wrap'>{ava_clickable}{meta_html}</div></div></div>"
         )
 
     # Закрываем все открытые группы
