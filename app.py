@@ -331,7 +331,7 @@ PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 html{scroll-behavior:smooth}
-body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple-system,sans-serif;font-weight:500;font-size:15px;line-height:1.45;letter-spacing:-0.01em}
+body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;font-weight:500;font-size:15px;line-height:1.45;letter-spacing:-0.01em}
 .w{max-width:1200px;margin:0 auto;padding:16px}
 
 /* Панель фильтров */
@@ -664,7 +664,7 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
   </div>
 
   <div id="dateFilterTag" class="filter-tag date-tag">
-    <span>📅</span> <span id="dateFilterName"></span>
+    <span id="dateFilterName"></span>
     <span class="tag-close" onclick="clearDateFilter()" title="Сбросить фильтр даты">✕</span>
   </div>
 
@@ -730,6 +730,7 @@ function updateDateUI() {
   } else {
     tag.classList.remove('visible');
   }
+  updateChatTagUI();
 }
 
 function toggleQuickDate(mode) {
@@ -814,14 +815,6 @@ function onSearchInput(val) {
 
 function setFilter(f) {
   currentFilter = f;
-  if (f === 'all') {
-    // Мгновенный сброс даты и чата при переходе на "Все", чтобы сразу отобразились все сообщения
-    currentDate = '';
-    currentDateLabel = '';
-    currentChat = '';
-    currentChatTitle = '';
-    updateDateUI();
-  }
   updatePillsUI();
   updateURL();
   fetchRows(true);
@@ -935,41 +928,22 @@ function applyCollapsedState() {
   });
 }
 
-// Замена всех эмодзи на Apple Emoji
-function applyAppleEmojis(root) {
-  if (!root) return;
-  const regex = /(\p{Extended_Pictographic}(?:\u200d\p{Extended_Pictographic})*)/gu;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  const nodes = [];
-  while(walker.nextNode()) {
-    if (regex.test(walker.currentNode.nodeValue)) {
-      nodes.push(walker.currentNode);
-    }
-  }
-  nodes.forEach(node => {
-    const parent = node.parentNode;
-    if(parent && (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE' || parent.classList.contains('apple-emoji'))) return;
-    const span = document.createElement('span');
-    span.innerHTML = node.nodeValue.replace(regex, m => 
-      `<img class="apple-emoji" src="https://emojicdn.elk.sh/${encodeURIComponent(m)}?style=apple" alt="${m}" draggable="false" loading="lazy">`
-    );
-    parent.replaceChild(span, node);
-  });
-}
-
 // Запускаем при загрузке
-applyAppleEmojis(document.getElementById('tb'));
 applyCollapsedState();
 
-let isFetching = false;
+let fetchSeq = 0;
 let currentAbortController = null;
+
 async function fetchRows(force = false) {
-  if (isFetching && !force) return;
-  if (force && currentAbortController) {
-    currentAbortController.abort();
+  const seq = ++fetchSeq;
+  if (currentAbortController) {
+    try {
+      currentAbortController.abort();
+    } catch(e) {}
   }
   currentAbortController = new AbortController();
-  isFetching = true;
+  const signal = currentAbortController.signal;
+
   try {
     const p = new URLSearchParams();
     if (currentQ) p.set('q', currentQ);
@@ -977,8 +951,13 @@ async function fetchRows(force = false) {
     if (currentChat) p.set('chat', currentChat);
     if (currentDate) p.set('date', currentDate);
 
-    const res = await fetch('/rows?' + p.toString(), { signal: currentAbortController.signal });
+    const res = await fetch('/rows?' + p.toString(), { signal });
+    if (!res.ok) return;
     const html = await res.text();
+
+    // Если был запущен более свежий запрос, отбрасываем устаревший ответ
+    if (seq !== fetchSeq) return;
+
     const tb = document.getElementById('tb');
     if (force || tb.innerHTML !== html) {
       tb.innerHTML = html;
@@ -1001,11 +980,8 @@ async function fetchRows(force = false) {
           }
         });
       }
-      requestAnimationFrame(() => applyAppleEmojis(tb));
     }
   } catch(e) {
-  } finally {
-    isFetching = false;
   }
 }
 
@@ -1032,8 +1008,6 @@ function toggleEdit(id, btn){
       btn.classList.add('active');
       btn.textContent = 'после изменения';
     }
-    applyAppleEmojis(el);
-
     el.classList.remove('diff-fade-out');
     el.classList.add('diff-fade-in');
 
