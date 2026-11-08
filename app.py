@@ -330,6 +330,7 @@ PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+html{scroll-behavior:smooth}
 body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple-system,sans-serif;font-weight:500;font-size:15px;line-height:1.45;letter-spacing:-0.01em}
 .w{max-width:1200px;margin:0 auto;padding:16px}
 
@@ -424,10 +425,17 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 
 table{width:100%;border-collapse:collapse}
 
-/* Разделители по датам */
+/* Разделители по датам со сворачиванием */
 tr.sep-row td{padding:0;background:#0a0a0a !important;border:none}
 tr.sep-row:hover td{background:#0a0a0a !important}
 
+.chevron-svg{
+  transition:transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display:inline-block;
+  vertical-align:middle;
+  flex-shrink:0;
+  opacity:0.6;
+}
 .sep-year{
   font-size:22px;
   font-weight:700;
@@ -435,14 +443,32 @@ tr.sep-row:hover td{background:#0a0a0a !important}
   letter-spacing:-0.02em;
   padding:32px 4px 10px;
   border-bottom:1px solid #222;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  user-select:none;
+  transition:color 0.15s;
 }
+.sep-year:hover{color:#e5e5e5}
+.sep-year:hover .chevron-svg{opacity:1;color:#fff}
+.sep-year.collapsed .chevron-svg{transform:rotate(-90deg)}
 
 .sep-month{
   font-size:16px;
   font-weight:600;
   color:#a3a3a3;
   padding:22px 6px 8px;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  user-select:none;
+  transition:color 0.15s;
 }
+.sep-month:hover{color:#fff}
+.sep-month:hover .chevron-svg{opacity:1;color:#fff}
+.sep-month.collapsed .chevron-svg{transform:rotate(-90deg)}
 
 .sep-day{
   display:flex;
@@ -450,25 +476,49 @@ tr.sep-row:hover td{background:#0a0a0a !important}
   gap:12px;
   padding:12px 6px 8px;
 }
-
-.sep-day-text{
+.sep-day-badge{
+  display:inline-flex;
+  align-items:center;
   background:#161616;
-  color:#bbb;
   border:1px solid #262626;
-  padding:3px 12px;
   border-radius:12px;
+  padding:2px 4px 2px 10px;
+  gap:4px;
+  transition:all 0.15s;
+  user-select:none;
+}
+.sep-day-badge:hover{
+  border-color:#383838;
+  background:#1c1c1c;
+}
+.sep-day-text{
+  color:#bbb;
   font-size:12px;
   font-weight:500;
   white-space:nowrap;
   cursor:pointer;
-  transition:all 0.15s;
-  user-select:none;
+  transition:color 0.15s;
 }
 .sep-day-text:hover{
-  background:#262626;
   color:#fff;
-  border-color:#444;
 }
+.sep-day-toggle{
+  background:none;
+  border:none;
+  color:#777;
+  cursor:pointer;
+  padding:2px 4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:6px;
+  transition:all 0.15s;
+}
+.sep-day-toggle:hover{
+  color:#fff;
+  background:#2a2a2a;
+}
+.sep-day-badge.collapsed .chevron-svg{transform:rotate(-90deg)}
 
 .sep-day-line{
   flex:1;
@@ -488,12 +538,15 @@ tr.empty-row td{background:transparent !important;padding:48px 10px;text-align:c
 tr.empty-row:hover td{background:transparent !important}
 
 td{padding:10px 14px;vertical-align:top}
-.n{width:50px;color:#666;font-size:13px;font-weight:400}
+.n{width:50px;color:#666;font-size:13px;font-weight:400;line-height:1.45;padding-top:12px}
 .t{white-space:pre-wrap;word-break:break-word}
-.d{width:80px;color:#9a9a9a;font-weight:400;white-space:nowrap;font-size:13px}
+.d{width:80px;color:#8a8a8a;font-weight:400;white-space:nowrap;font-size:13px;line-height:1.45;padding-top:12px;font-variant-numeric:tabular-nums}
 .s{width:330px}.s div{display:flex;align-items:center;gap:8px}
-.s img,.s i{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;
- font:600 12px/22px 'Onest',sans-serif;text-align:center;color:#aaa}
+.s a.ava-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;text-decoration:none}
+.s img{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;display:block}
+.s i{width:22px;height:22px;flex:none;border-radius:50%;background:#262626;border:1px solid #383838;
+ display:inline-flex;align-items:center;justify-content:center;font:600 11px/1 'Onest',sans-serif;font-style:normal;
+ text-align:center;color:#ccc;box-sizing:border-box;user-select:none}
 .s a{color:#bbb;text-decoration:none;font-weight:500;cursor:pointer;transition:color 0.15s}
 .s a:hover{color:#fff;text-decoration:underline}
 .s span{color:#777;font-weight:400}
@@ -504,7 +557,27 @@ td{padding:10px 14px;vertical-align:top}
  border-left:3px solid #5a5a5a;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-arrow{display:inline-block;vertical-align:middle;margin:0 6px;flex-shrink:0;opacity:0.75;transition:opacity 0.15s,transform 0.15s}
 .reply-wrap:hover .reply-arrow{opacity:1;transform:translateX(1px)}
-.reply-text{color:#fff;transition:color 0.2s}
+.reply-text{
+  display:inline-block;
+  vertical-align:baseline;
+  color:#fff;
+  transition:opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+             filter 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+             color 0.2s;
+}
+.reply-text.diff-fade-out{
+  opacity:0;
+  transform:scale(0.97) translateY(-2px);
+  filter:blur(2px);
+}
+.reply-text.diff-fade-in{
+  animation:diffFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes diffFadeIn{
+  from{opacity:0;transform:scale(0.97) translateY(2px);filter:blur(2px)}
+  to{opacity:1;transform:scale(1) translateY(0);filter:blur(0)}
+}
 .reply-text.is-orig{color:#a8a29e;text-decoration:line-through;opacity:0.85}
 
 /* Apple Emoji стиль */
@@ -744,11 +817,88 @@ function resetAllFilters() {
   currentChatTitle = '';
   currentDate = '';
   currentDateLabel = '';
+  collapsedYears.clear();
+  collapsedMonths.clear();
+  collapsedDays.clear();
   document.getElementById('searchInput').value = '';
   updateDateUI();
   updatePillsUI();
   updateURL();
   fetchRows(true);
+}
+
+// Управление сворачиванием дат (Год / Месяц / День)
+const collapsedYears = new Set();
+const collapsedMonths = new Set();
+const collapsedDays = new Set();
+
+function toggleCollapseYear(year, el, e) {
+  if (e) e.stopPropagation();
+  const yStr = String(year);
+  if (collapsedYears.has(yStr)) {
+    collapsedYears.delete(yStr);
+  } else {
+    collapsedYears.add(yStr);
+  }
+  applyCollapsedState();
+}
+
+function toggleCollapseMonth(monthStr, el, e) {
+  if (e) e.stopPropagation();
+  if (collapsedMonths.has(monthStr)) {
+    collapsedMonths.delete(monthStr);
+  } else {
+    collapsedMonths.add(monthStr);
+  }
+  applyCollapsedState();
+}
+
+function toggleCollapseDay(dayStr, btn, e) {
+  if (e) e.stopPropagation();
+  if (collapsedDays.has(dayStr)) {
+    collapsedDays.delete(dayStr);
+  } else {
+    collapsedDays.add(dayStr);
+  }
+  applyCollapsedState();
+}
+
+function applyCollapsedState() {
+  document.querySelectorAll('.sep-year-row').forEach(row => {
+    const yr = row.getAttribute('data-sep-year');
+    const isCol = collapsedYears.has(yr);
+    const box = row.querySelector('.sep-year');
+    if (box) box.classList.toggle('collapsed', isCol);
+  });
+
+  document.querySelectorAll('.sep-month-row').forEach(row => {
+    const yr = row.getAttribute('data-sep-year');
+    const mo = row.getAttribute('data-sep-month');
+    const isHiddenByYear = collapsedYears.has(yr);
+    row.style.display = isHiddenByYear ? 'none' : '';
+    const isCol = collapsedMonths.has(mo);
+    const box = row.querySelector('.sep-month');
+    if (box) box.classList.toggle('collapsed', isCol);
+  });
+
+  document.querySelectorAll('.sep-day-row').forEach(row => {
+    const yr = row.getAttribute('data-sep-year');
+    const mo = row.getAttribute('data-sep-month');
+    const dy = row.getAttribute('data-sep-day');
+    const isHidden = collapsedYears.has(yr) || collapsedMonths.has(mo);
+    row.style.display = isHidden ? 'none' : '';
+    const isCol = collapsedDays.has(dy);
+    const badge = row.querySelector('.sep-day-badge');
+    if (badge) badge.classList.toggle('collapsed', isCol);
+  });
+
+  document.querySelectorAll('.msg-row').forEach(row => {
+    const yr = row.getAttribute('data-msg-year');
+    const mo = row.getAttribute('data-msg-month');
+    const dy = row.getAttribute('data-msg-day');
+    const isHidden = collapsedYears.has(yr) || collapsedMonths.has(mo) || collapsedDays.has(dy);
+    row.style.display = isHidden ? 'none' : '';
+  });
 }
 
 // Замена всех эмодзи на Apple Emoji
@@ -775,6 +925,7 @@ function applyAppleEmojis(root) {
 
 // Запускаем при загрузке
 applyAppleEmojis(document.getElementById('tb'));
+applyCollapsedState();
 
 let isFetching = false;
 let currentAbortController = null;
@@ -797,6 +948,7 @@ async function fetchRows(force = false) {
     const tb = document.getElementById('tb');
     if (force || tb.innerHTML !== html) {
       tb.innerHTML = html;
+      applyCollapsedState();
       showingOrig.forEach(id => {
         const el = document.getElementById('text-' + id);
         const btn = document.getElementById('btn-' + id);
@@ -828,20 +980,34 @@ setInterval(() => fetchRows(false), 3000);
 function toggleEdit(id, btn){
   const el = document.getElementById('text-' + id);
   if(!el) return;
-  if(showingOrig.has(id)){
-    showingOrig.delete(id);
-    el.textContent = el.getAttribute('data-curr');
-    el.classList.remove('is-orig');
-    btn.classList.remove('active');
-    btn.textContent = 'до изменения';
-  } else {
-    showingOrig.add(id);
-    el.textContent = el.getAttribute('data-orig') || '(неизвестно)';
-    el.classList.add('is-orig');
-    btn.classList.add('active');
-    btn.textContent = 'после изменения';
-  }
-  applyAppleEmojis(el);
+
+  btn.style.pointerEvents = 'none';
+  el.classList.add('diff-fade-out');
+
+  setTimeout(() => {
+    if(showingOrig.has(id)){
+      showingOrig.delete(id);
+      el.textContent = el.getAttribute('data-curr');
+      el.classList.remove('is-orig');
+      btn.classList.remove('active');
+      btn.textContent = 'до изменения';
+    } else {
+      showingOrig.add(id);
+      el.textContent = el.getAttribute('data-orig') || '(неизвестно)';
+      el.classList.add('is-orig');
+      btn.classList.add('active');
+      btn.textContent = 'после изменения';
+    }
+    applyAppleEmojis(el);
+
+    el.classList.remove('diff-fade-out');
+    el.classList.add('diff-fade-in');
+
+    setTimeout(() => {
+      el.classList.remove('diff-fade-in');
+      btn.style.pointerEvents = 'auto';
+    }, 220);
+  }, 160);
 }
 
 function showMedia(url, type, e){
@@ -1020,6 +1186,11 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         '<path d="M3 8h10M9 4l4 4-4 4" stroke="#606060" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
         '</svg>'
     )
+    chevron_svg = (
+        '<svg class="chevron-svg" viewBox="0 0 16 16" width="12" height="12" fill="none">'
+        '<path d="M3.5 6l4.5 4.5 4.5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        '</svg>'
+    )
 
     last_year = None
     last_month = None
@@ -1037,8 +1208,10 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         # 1. Разделитель года
         if curr_year != last_year:
             out.append(
-                f'<tr class="sep-row"><td colspan="4">'
-                f'<div class="sep-year">{curr_year}</div>'
+                f'<tr class="sep-row sep-year-row" data-sep-year="{curr_year}"><td colspan="4">'
+                f'<div class="sep-year" onclick="toggleCollapseYear({curr_year}, this, event)" title="Свернуть / развернуть {curr_year} год">'
+                f'<span>{curr_year}</span>{chevron_svg}'
+                f'</div>'
                 f'</td></tr>'
             )
             last_year = curr_year
@@ -1048,9 +1221,12 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         # 2. Разделитель месяца
         if curr_month != last_month:
             m_name = MONTHS_NOM.get(curr_month, "")
+            month_key = f"{curr_year}-{curr_month:02d}"
             out.append(
-                f'<tr class="sep-row"><td colspan="4">'
-                f'<div class="sep-month">{m_name}</div>'
+                f'<tr class="sep-row sep-month-row" data-sep-year="{curr_year}" data-sep-month="{month_key}"><td colspan="4">'
+                f'<div class="sep-month" onclick="toggleCollapseMonth(\'{month_key}\', this, event)" title="Свернуть / развернуть {m_name}">'
+                f'<span>{m_name}</span>{chevron_svg}'
+                f'</div>'
                 f'</td></tr>'
             )
             last_month = curr_month
@@ -1060,11 +1236,15 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         if curr_day != last_day:
             day_label = f"{d.day} {MONTHS_GEN.get(curr_month, '')}"
             iso_day = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
+            month_key = f"{curr_year}-{curr_month:02d}"
             day_label_attr = html.escape(day_label.replace("'", "\\'"), True)
             out.append(
-                f'<tr class="sep-row"><td colspan="4">'
+                f'<tr class="sep-row sep-day-row" data-sep-year="{curr_year}" data-sep-month="{month_key}" data-sep-day="{iso_day}"><td colspan="4">'
                 f'<div class="sep-day">'
+                f'<div class="sep-day-badge">'
                 f'<span class="sep-day-text" onclick="filterDate(\'{iso_day}\', \'{day_label_attr}\')" title="Показать только сообщения за {day_label}">{day_label}</span>'
+                f'<button type="button" class="sep-day-toggle" onclick="toggleCollapseDay(\'{iso_day}\', this, event)" title="Свернуть / развернуть {day_label}">{chevron_svg}</button>'
+                f'</div>'
                 f'<div class="sep-day-line"></div>'
                 f'</div>'
                 f'</td></tr>'
@@ -1076,7 +1256,7 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         title_attr = html.escape(title_clean.replace("'", "\\'"), True)
 
         ava = f'<img src="/avatars/{av}">' if av else f"<i>{html.escape(title_clean[:1].upper())}</i>"
-        ava_clickable = f'<a href="javascript:void(0)" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{ava}</a>'
+        ava_clickable = f'<a href="javascript:void(0)" class="ava-link" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{ava}</a>'
         chat_link = f'<a href="javascript:void(0)" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{title_esc}</a>'
         un = f"<span>@{html.escape(uname)}</span>" if uname else ""
 
@@ -1120,9 +1300,12 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
 
         row_cls = "row-odd" if row_idx % 2 == 0 else "row-even"
         row_idx += 1
+        month_key = f"{curr_year}-{curr_month:02d}"
+        iso_day = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
 
         out.append(
-            f"<tr class='{row_cls}'><td class=n>{i}</td><td class=t>{content_html}</td>"
+            f"<tr class='{row_cls} msg-row' data-msg-year='{curr_year}' data-msg-month='{month_key}' data-msg-day='{iso_day}'>"
+            f"<td class=n>{i}</td><td class=t>{content_html}</td>"
             f"<td class=d title='{d:%d.%m.%Y %H:%M}'>{d:%H:%M}</td>"
             f"<td class=s><div>{ava_clickable}{chat_link}{un}</div></td></tr>"
         )
