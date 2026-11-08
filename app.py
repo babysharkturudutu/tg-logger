@@ -423,12 +423,26 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
   pointer-events:auto;
 }
 
-table{width:100%;border-collapse:collapse}
+/* Лента сообщений и плавный аккордеон */
+.feed{display:flex;flex-direction:column;width:100%}
+
+.accordion-body{
+  display:grid;
+  grid-template-rows:1fr;
+  transition:grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+             opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity:1;
+}
+.accordion-body.collapsed{
+  grid-template-rows:0fr !important;
+  opacity:0 !important;
+}
+.accordion-inner{
+  min-height:0;
+  overflow:hidden;
+}
 
 /* Разделители по датам со сворачиванием */
-tr.sep-row td{padding:0;background:#0a0a0a !important;border:none}
-tr.sep-row:hover td{background:#0a0a0a !important}
-
 .chevron-svg{
   transition:transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display:inline-block;
@@ -527,21 +541,34 @@ tr.sep-row:hover td{background:#0a0a0a !important}
 }
 
 /* Строки сообщений (зебра) - серый прямоугольник на ховер полностью убран */
-tr.row-odd{background:#0d0d0d}
-tr.row-even{background:#141414}
-tr:hover{background:none}
-tr.row-odd:hover{background:#0d0d0d}
-tr.row-even:hover{background:#141414}
+.msg-row{
+  display:flex;
+  align-items:flex-start;
+  padding:0;
+  box-sizing:border-box;
+}
+.msg-row > div{
+  padding:10px 14px;
+  box-sizing:border-box;
+}
+.msg-row.row-odd{background:#0d0d0d}
+.msg-row.row-even{background:#141414}
+.msg-row:hover{background:none}
+.msg-row.row-odd:hover{background:#0d0d0d}
+.msg-row.row-even:hover{background:#141414}
 
 /* Пустое состояние */
-tr.empty-row td{background:transparent !important;padding:48px 10px;text-align:center;color:#666;font-size:14px;border:none}
-tr.empty-row:hover td{background:transparent !important}
+.empty-feed{
+  padding:48px 10px;
+  text-align:center;
+  color:#666;
+  font-size:14px;
+}
 
-td{padding:10px 14px;vertical-align:top}
-.n{width:50px;color:#666;font-size:13px;font-weight:400;line-height:1.45;padding-top:12px}
-.t{white-space:pre-wrap;word-break:break-word}
-.d{width:80px;color:#8a8a8a;font-weight:400;white-space:nowrap;font-size:13px;line-height:1.45;padding-top:12px;font-variant-numeric:tabular-nums}
-.s{width:330px}.s div{display:flex;align-items:center;gap:8px}
+.n{width:50px;flex-shrink:0;color:#666;font-size:13px;font-weight:400;line-height:1.45;padding-top:12px !important}
+.t{flex:1 1 0%;min-width:0;white-space:pre-wrap;word-break:break-word}
+.d{width:80px;flex-shrink:0;color:#8a8a8a;font-weight:400;white-space:nowrap;font-size:13px;line-height:1.45;padding-top:12px !important;font-variant-numeric:tabular-nums}
+.s{width:330px;flex-shrink:0}.s div{display:flex;align-items:center;gap:8px}
 .s a.ava-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;text-decoration:none}
 .s img{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;display:block}
 .s i{width:22px;height:22px;flex:none;border-radius:50%;background:#262626;border:1px solid #383838;
@@ -614,7 +641,11 @@ td{padding:10px 14px;vertical-align:top}
 .modal{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);
  z-index:9999;justify-content:center;align-items:center}
 
-@media(max-width:700px){.s{width:auto}.d{width:auto}}
+@media(max-width:700px){
+  .msg-row{flex-wrap:wrap}
+  .s{width:100%;order:3}
+  .d{width:auto}
+}
 </style></head><body><div class="w">
 
 <div class="toolbar">
@@ -645,7 +676,7 @@ td{padding:10px 14px;vertical-align:top}
   <button id="resetAllBtn" class="reset-btn" onclick="resetAllFilters()">Сбросить всё</button>
 </div>
 
-<table><tbody id="tb">%ROWS%</tbody></table></div>
+<div id="tb" class="feed">%ROWS%</div></div>
 
 <div id="modal" class="modal" onclick="closeModal()"></div>
 
@@ -820,6 +851,8 @@ function resetAllFilters() {
   collapsedYears.clear();
   collapsedMonths.clear();
   collapsedDays.clear();
+  document.querySelectorAll('.accordion-body.collapsed').forEach(b => b.classList.remove('collapsed'));
+  document.querySelectorAll('.sep-year.collapsed, .sep-month.collapsed, .sep-day-badge.collapsed').forEach(h => h.classList.remove('collapsed'));
   document.getElementById('searchInput').value = '';
   updateDateUI();
   updatePillsUI();
@@ -840,7 +873,7 @@ function toggleCollapseYear(year, el, e) {
   } else {
     collapsedYears.add(yStr);
   }
-  applyCollapsedState();
+  applyCollapsedYear(yStr);
 }
 
 function toggleCollapseMonth(monthStr, el, e) {
@@ -850,7 +883,7 @@ function toggleCollapseMonth(monthStr, el, e) {
   } else {
     collapsedMonths.add(monthStr);
   }
-  applyCollapsedState();
+  applyCollapsedMonth(monthStr);
 }
 
 function toggleCollapseDay(dayStr, btn, e) {
@@ -860,44 +893,45 @@ function toggleCollapseDay(dayStr, btn, e) {
   } else {
     collapsedDays.add(dayStr);
   }
-  applyCollapsedState();
+  applyCollapsedDay(dayStr);
+}
+
+function applyCollapsedYear(yStr) {
+  const isCol = collapsedYears.has(yStr);
+  const body = document.getElementById('body-year-' + yStr);
+  const hdr = document.getElementById('hdr-year-' + yStr);
+  if (body) body.classList.toggle('collapsed', isCol);
+  if (hdr) hdr.classList.toggle('collapsed', isCol);
+}
+
+function applyCollapsedMonth(mStr) {
+  const isCol = collapsedMonths.has(mStr);
+  const body = document.getElementById('body-month-' + mStr);
+  const hdr = document.getElementById('hdr-month-' + mStr);
+  if (body) body.classList.toggle('collapsed', isCol);
+  if (hdr) hdr.classList.toggle('collapsed', isCol);
+}
+
+function applyCollapsedDay(dStr) {
+  const isCol = collapsedDays.has(dStr);
+  const body = document.getElementById('body-day-' + dStr);
+  const badge = document.getElementById('hdr-day-' + dStr);
+  if (body) body.classList.toggle('collapsed', isCol);
+  if (badge) badge.classList.toggle('collapsed', isCol);
 }
 
 function applyCollapsedState() {
-  document.querySelectorAll('.sep-year-row').forEach(row => {
-    const yr = row.getAttribute('data-sep-year');
-    const isCol = collapsedYears.has(yr);
-    const box = row.querySelector('.sep-year');
-    if (box) box.classList.toggle('collapsed', isCol);
+  document.querySelectorAll('[id^="body-year-"]').forEach(body => {
+    const yStr = body.id.replace('body-year-', '');
+    applyCollapsedYear(yStr);
   });
-
-  document.querySelectorAll('.sep-month-row').forEach(row => {
-    const yr = row.getAttribute('data-sep-year');
-    const mo = row.getAttribute('data-sep-month');
-    const isHiddenByYear = collapsedYears.has(yr);
-    row.style.display = isHiddenByYear ? 'none' : '';
-    const isCol = collapsedMonths.has(mo);
-    const box = row.querySelector('.sep-month');
-    if (box) box.classList.toggle('collapsed', isCol);
+  document.querySelectorAll('[id^="body-month-"]').forEach(body => {
+    const mStr = body.id.replace('body-month-', '');
+    applyCollapsedMonth(mStr);
   });
-
-  document.querySelectorAll('.sep-day-row').forEach(row => {
-    const yr = row.getAttribute('data-sep-year');
-    const mo = row.getAttribute('data-sep-month');
-    const dy = row.getAttribute('data-sep-day');
-    const isHidden = collapsedYears.has(yr) || collapsedMonths.has(mo);
-    row.style.display = isHidden ? 'none' : '';
-    const isCol = collapsedDays.has(dy);
-    const badge = row.querySelector('.sep-day-badge');
-    if (badge) badge.classList.toggle('collapsed', isCol);
-  });
-
-  document.querySelectorAll('.msg-row').forEach(row => {
-    const yr = row.getAttribute('data-msg-year');
-    const mo = row.getAttribute('data-msg-month');
-    const dy = row.getAttribute('data-msg-day');
-    const isHidden = collapsedYears.has(yr) || collapsedMonths.has(mo) || collapsedDays.has(dy);
-    row.style.display = isHidden ? 'none' : '';
+  document.querySelectorAll('[id^="body-day-"]').forEach(body => {
+    const dStr = body.id.replace('body-day-', '');
+    applyCollapsedDay(dStr);
   });
 }
 
@@ -1204,56 +1238,73 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         curr_year = d.year
         curr_month = d.month
         curr_day = (d.year, d.month, d.day)
+        month_key = f"{curr_year}-{curr_month:02d}"
+        iso_day = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
 
-        # 1. Разделитель года
+        # 1. Смена года
         if curr_year != last_year:
+            if last_day is not None:
+                out.append("</div></div></div>")
+                last_day = None
+            if last_month is not None:
+                out.append("</div></div></div>")
+                last_month = None
+            if last_year is not None:
+                out.append("</div></div></div>")
+
             out.append(
-                f'<tr class="sep-row sep-year-row" data-sep-year="{curr_year}"><td colspan="4">'
-                f'<div class="sep-year" onclick="toggleCollapseYear({curr_year}, this, event)" title="Свернуть / развернуть {curr_year} год">'
+                f'<div class="group-year" id="grp-year-{curr_year}">'
+                f'<div class="sep-year" id="hdr-year-{curr_year}" onclick="toggleCollapseYear({curr_year}, this, event)" title="Свернуть / развернуть {curr_year} год">'
                 f'<span>{curr_year}</span>{chevron_svg}'
                 f'</div>'
-                f'</td></tr>'
+                f'<div class="accordion-body" id="body-year-{curr_year}"><div class="accordion-inner">'
             )
             last_year = curr_year
             last_month = None
             last_day = None
 
-        # 2. Разделитель месяца
+        # 2. Смена месяца
         if curr_month != last_month:
+            if last_day is not None:
+                out.append("</div></div></div>")
+                last_day = None
+            if last_month is not None:
+                out.append("</div></div></div>")
+
             m_name = MONTHS_NOM.get(curr_month, "")
-            month_key = f"{curr_year}-{curr_month:02d}"
             out.append(
-                f'<tr class="sep-row sep-month-row" data-sep-year="{curr_year}" data-sep-month="{month_key}"><td colspan="4">'
-                f'<div class="sep-month" onclick="toggleCollapseMonth(\'{month_key}\', this, event)" title="Свернуть / развернуть {m_name}">'
+                f'<div class="group-month" id="grp-month-{month_key}">'
+                f'<div class="sep-month" id="hdr-month-{month_key}" onclick="toggleCollapseMonth(\'{month_key}\', this, event)" title="Свернуть / развернуть {m_name}">'
                 f'<span>{m_name}</span>{chevron_svg}'
                 f'</div>'
-                f'</td></tr>'
+                f'<div class="accordion-body" id="body-month-{month_key}"><div class="accordion-inner">'
             )
             last_month = curr_month
             last_day = None
 
-        # 3. Разделитель дня
+        # 3. Смена дня
         if curr_day != last_day:
+            if last_day is not None:
+                out.append("</div></div></div>")
+
             day_label = f"{d.day} {MONTHS_GEN.get(curr_month, '')}"
-            iso_day = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
-            month_key = f"{curr_year}-{curr_month:02d}"
-            day_label_attr = html.escape(day_label.replace("'", "\\'"), True)
+            day_label_attr = html.escape(day_label.replace("'", "\'"), True)
             out.append(
-                f'<tr class="sep-row sep-day-row" data-sep-year="{curr_year}" data-sep-month="{month_key}" data-sep-day="{iso_day}"><td colspan="4">'
+                f'<div class="group-day" id="grp-day-{iso_day}">'
                 f'<div class="sep-day">'
-                f'<div class="sep-day-badge">'
+                f'<div class="sep-day-badge" id="hdr-day-{iso_day}">'
                 f'<span class="sep-day-text" onclick="filterDate(\'{iso_day}\', \'{day_label_attr}\')" title="Показать только сообщения за {day_label}">{day_label}</span>'
                 f'<button type="button" class="sep-day-toggle" onclick="toggleCollapseDay(\'{iso_day}\', this, event)" title="Свернуть / развернуть {day_label}">{chevron_svg}</button>'
                 f'</div>'
                 f'<div class="sep-day-line"></div>'
                 f'</div>'
-                f'</td></tr>'
+                f'<div class="accordion-body" id="body-day-{iso_day}"><div class="accordion-inner">'
             )
             last_day = curr_day
 
         title_clean = title or "Без имени"
         title_esc = html.escape(title_clean)
-        title_attr = html.escape(title_clean.replace("'", "\\'"), True)
+        title_attr = html.escape(title_clean.replace("'", "\'"), True)
 
         ava = f'<img src="/avatars/{av}">' if av else f"<i>{html.escape(title_clean[:1].upper())}</i>"
         ava_clickable = f'<a href="javascript:void(0)" class="ava-link" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{ava}</a>'
@@ -1300,19 +1351,24 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
 
         row_cls = "row-odd" if row_idx % 2 == 0 else "row-even"
         row_idx += 1
-        month_key = f"{curr_year}-{curr_month:02d}"
-        iso_day = f"{d.year:04d}-{d.month:02d}-{d.day:02d}"
 
         out.append(
-            f"<tr class='{row_cls} msg-row' data-msg-year='{curr_year}' data-msg-month='{month_key}' data-msg-day='{iso_day}'>"
-            f"<td class=n>{i}</td><td class=t>{content_html}</td>"
-            f"<td class=d title='{d:%d.%m.%Y %H:%M}'>{d:%H:%M}</td>"
-            f"<td class=s><div>{ava_clickable}{chat_link}{un}</div></td></tr>"
+            f"<div class='{row_cls} msg-row' data-msg-year='{curr_year}' data-msg-month='{month_key}' data-msg-day='{iso_day}'>"
+            f"<div class=n>{i}</div><div class=t>{content_html}</div>"
+            f"<div class=d title='{d:%d.%m.%Y %H:%M}'>{d:%H:%M}</div>"
+            f"<div class=s><div>{ava_clickable}{chat_link}{un}</div></div></div>"
         )
 
-    if not out:
-        return '<tr class="empty-row"><td colspan="4">Сообщений не найдено</td></tr>'
+    # Закрываем все открытые группы
+    if last_day is not None:
+        out.append("</div></div></div>")
+    if last_month is not None:
+        out.append("</div></div></div>")
+    if last_year is not None:
+        out.append("</div></div></div>")
 
+    if not out:
+        return '<div class="empty-feed">Сообщений не найдено</div>'
     return "".join(out)
 
 
