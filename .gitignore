@@ -17,6 +17,11 @@ avatars/*
 *.txt
 !requirements.txt
 
+# Archives
+*.tgz
+*.tar.gz
+*.zip
+
 # Python virtual environment and cache
 __pycache__/
 *.py[cod]

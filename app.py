@@ -1,5 +1,5 @@
 """TG Logger: Telethon userbot + FastAPI web UI."""
-import asyncio, html, os, sqlite3, sys
+import asyncio, html, json, os, re, sqlite3, sys, urllib.request
 from datetime import timezone, datetime, timedelta
 from pathlib import Path
 
@@ -21,8 +21,8 @@ if _env_path.exists():
             os.environ.setdefault(_k.strip(), _v.strip())
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Response
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from telethon import TelegramClient, events, utils
 
@@ -51,6 +51,32 @@ AV = Path("avatars")
 AV.mkdir(exist_ok=True)
 MEDIA = Path("media")
 MEDIA.mkdir(exist_ok=True)
+EMOJIS = Path("emojis")
+EMOJIS.mkdir(exist_ok=True)
+
+# Загрузка локальных Apple Emoji (мгновенная замена без сторонних запросов)
+MAP_FILE = Path("emoji_map.json")
+EMOJI_MAP = {}
+EMOJI_PATTERN = None
+if MAP_FILE.exists():
+    try:
+        with open(MAP_FILE, "r", encoding="utf-8") as f:
+            EMOJI_MAP = json.load(f)
+        sorted_keys = sorted(EMOJI_MAP.keys(), key=len, reverse=True)
+        EMOJI_PATTERN = re.compile("|".join(re.escape(k) for k in sorted_keys))
+    except Exception as e:
+        print(f"Error loading emoji map: {e}")
+
+def emoji_html(text: str) -> str:
+    if not text:
+        return ""
+    escaped = html.escape(text)
+    if not EMOJI_PATTERN:
+        return escaped
+    return EMOJI_PATTERN.sub(
+        lambda m: f'<img class="apple-emoji" src="/emojis/{EMOJI_MAP[m.group(0)]}" alt="{m.group(0)}" loading="lazy">',
+        escaped
+    )
 
 MONTHS_NOM = {
     1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель", 5: "Май", 6: "Июнь",
@@ -323,6 +349,24 @@ app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=AV), name="avatars")
 app.mount("/media", StaticFiles(directory=MEDIA), name="media")
 
+@app.get("/emojis/{fname}")
+async def get_emoji_file(fname: str):
+    target = EMOJIS / fname
+    if target.exists():
+        return FileResponse(target, media_type="image/png", headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    # Fallback на случай, если файла нет на диске
+    try:
+        url = f"https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/img/apple/64/{fname}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            if resp.status == 200:
+                content = resp.read()
+                target.write_bytes(content)
+                return Response(content=content, media_type="image/png", headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    except Exception:
+        pass
+    return Response(status_code=404)
+
 PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>TG Logger</title>
 <!-- Шрифт Onest -->
@@ -570,10 +614,10 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .d{width:80px;flex-shrink:0;color:#8a8a8a;font-weight:400;white-space:nowrap;font-size:13px;line-height:1.45;padding-top:12px !important;font-variant-numeric:tabular-nums}
 .s{width:330px;flex-shrink:0}.s div{display:flex;align-items:center;gap:8px}
 .s a.ava-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;text-decoration:none}
-.s img{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;display:block}
+.s img{width:22px;height:22px;flex:none;border-radius:50%;object-fit:cover;background:#333;display:block;aspect-ratio:1/1}
 .s i{width:22px;height:22px;flex:none;border-radius:50%;background:#262626;border:1px solid #383838;
  display:inline-flex;align-items:center;justify-content:center;font:600 11px/1 'Onest',sans-serif;font-style:normal;
- text-align:center;color:#ccc;box-sizing:border-box;user-select:none}
+ text-align:center;color:#ccc;box-sizing:border-box;user-select:none;aspect-ratio:1/1}
 .s a{color:#bbb;text-decoration:none;font-weight:500;cursor:pointer;transition:color 0.15s}
 .s a:hover{color:#fff;text-decoration:underline}
 .s span{color:#777;font-weight:400}
@@ -608,7 +652,7 @@ body{margin:0;background:#0a0a0a;color:#fff;font-family:'Onest',system-ui,-apple
 .reply-text.is-orig{color:#a8a29e;text-decoration:line-through;opacity:0.85}
 
 /* Apple Emoji стиль */
-.apple-emoji{width:1.2em;height:1.2em;vertical-align:-0.2em;margin:0 0.12em;display:inline-block}
+.apple-emoji{width:1.25em;height:1.25em;vertical-align:-0.22em;margin:0 0.1em;display:inline-block;object-fit:contain}
 
 /* Скругленный квадрат для фото / видео */
 .media-thumb{width:32px;height:32px;border-radius:6px;border:1px solid #383838;background:#181818;
@@ -966,7 +1010,7 @@ async function fetchRows(force = false) {
         const el = document.getElementById('text-' + id);
         const btn = document.getElementById('btn-' + id);
         if(el && btn){
-          el.textContent = el.getAttribute('data-orig') || '';
+          el.innerHTML = el.getAttribute('data-orig-html') || '';
           el.classList.add('is-orig');
           btn.classList.add('active');
           btn.textContent = 'после изменения';
@@ -997,13 +1041,13 @@ function toggleEdit(id, btn){
   setTimeout(() => {
     if(showingOrig.has(id)){
       showingOrig.delete(id);
-      el.textContent = el.getAttribute('data-curr');
+      el.innerHTML = el.getAttribute('data-curr-html') || '';
       el.classList.remove('is-orig');
       btn.classList.remove('active');
       btn.textContent = 'до изменения';
     } else {
       showingOrig.add(id);
-      el.textContent = el.getAttribute('data-orig') || '(неизвестно)';
+      el.innerHTML = el.getAttribute('data-orig-html') || '(неизвестно)';
       el.classList.add('is-orig');
       btn.classList.add('active');
       btn.textContent = 'после изменения';
@@ -1277,7 +1321,7 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
             last_day = curr_day
 
         title_clean = title or "Без имени"
-        title_esc = html.escape(title_clean)
+        title_esc = emoji_html(title_clean)
         title_attr = html.escape(title_clean.replace("'", "\'"), True)
 
         ava = f'<img src="/avatars/{av}">' if av else f"<i>{html.escape(title_clean[:1].upper())}</i>"
@@ -1285,9 +1329,11 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
         chat_link = f'<a href="javascript:void(0)" onclick="filterChat({cid}, \'{title_attr}\')" title="Показать только этот чат">{title_esc}</a>'
         un = f"<span>@{html.escape(uname)}</span>" if uname else ""
 
-        curr_attr = html.escape(text or "", True)
-        orig_attr = html.escape(orig_text or "", True)
-        text_span = f'<span id="text-{i}" class="reply-text" data-curr="{curr_attr}" data-orig="{orig_attr}">{html.escape(text)}</span>'
+        curr_esc = emoji_html(text or "")
+        orig_esc = emoji_html(orig_text or "")
+        curr_attr = html.escape(curr_esc, True)
+        orig_attr = html.escape(orig_esc, True)
+        text_span = f'<span id="text-{i}" class="reply-text" data-curr-html="{curr_attr}" data-orig-html="{orig_attr}">{curr_esc}</span>'
 
         msg_media_html = render_media_badge(media)
 
@@ -1298,7 +1344,7 @@ def rows_html(q="", filter_type="all", chat_id=None, date_str="", limit=300):
             if rep_media_badge:
                 rep_parts.append(rep_media_badge)
             if rep_text and rep_text != "[медиа]":
-                rep_parts.append(f'<span class="reply-orig" title="{html.escape(rep_text)}">{html.escape(rep_text)}</span>')
+                rep_parts.append(f'<span class="reply-orig" title="{html.escape(rep_text)}">{emoji_html(rep_text)}</span>')
 
             orig_side = " ".join(rep_parts)
             reply_side = " ".join(filter(None, [text_span if text else "", msg_media_html]))
